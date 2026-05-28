@@ -1,0 +1,67 @@
+openapi: 3.0.1
+info:
+  title: Sample Orders API
+  version: 1.0.0
+  description: API for managing orders
+  contact:
+    name: Orders Platform Team
+    email: orders-team@example.com
+  x-owner: team-orders@example.com
+servers:
+  - url: https://api.example.com
+tags:
+  - name: orders
+    description: Order management endpoints
+  - name: health
+    description: Health and diagnostics endpoints
+paths:
+  /v1/orders:
+    get:
+      summary: List orders
+      description: Retrieve a list of orders for the current tenant.
+      operationId: getOrders
+      tags:
+        - orders
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    customer:
+                      type: string
+                    total:
+                      type: number
+                      format: float
+  /v1/health:
+    get:
+      summary: Health check
+      description: Returns service health status.
+      operationId: getHealth
+      tags:
+        - health
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-opentelemetry:
+  service.name: orders-api

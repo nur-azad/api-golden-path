@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Readiness Card</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+        .app-wrapper { width: 100%; max-width: 720px; }
+        .page-label {
+            font-size: 0.8rem;
+            color: #555;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        .card {
+            background: #141414;
+            border: 1px solid #222;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 28px 28px 20px;
+            border-bottom: 1px solid #1e1e1e;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .api-name {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+        .api-desc {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 6px;
+        }
+        .badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .badge-ready { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+        .badge-not-ready { background: rgba(211,47,47,0.12); color: #ef4444; border: 1px solid rgba(211,47,47,0.3); }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 20px 28px;
+            border-bottom: 1px solid #1e1e1e;
+            gap: 16px;
+        }
+        .meta-item {}
+        .meta-label {
+            font-size: 0.72rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            font-family: monospace;
+        }
+        .meta-value {
+            font-size: 0.9rem;
+            color: #ccc;
+            font-weight: 500;
+        }
+        .meta-value.lifecycle-production { color: #10b981; }
+        .checks-section { padding: 20px 28px 28px; }
+        .checks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .checks-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            font-family: monospace;
+        }
+        .checks-score {
+            font-size: 0.8rem;
+            font-family: monospace;
+            color: #ff6f00;
+        }
+        .check-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+            gap: 12px;
+            border: 1px solid transparent;
+        }
+        .check-row:hover { background: #1a1a1a; }
+        .check-row.expanded { background: #1a1a1a; border-color: #252525; }
+        .check-icon {
+            font-size: 0.95rem;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .check-label {
+            font-size: 0.9rem;
+            color: #ccc;
+            flex: 1;
+        }
+        .check-id {
+            font-size: 0.75rem;
+            font-family: monospace;
+            color: #444;
+            flex-shrink: 0;
+        }
+        .check-detail {
+            padding: 8px 12px 10px 44px;
+            font-size: 0.82rem;
+            color: #666;
+            line-height: 1.5;
+            border-bottom: 1px solid #1e1e1e;
+        }
+        .progress-bar-wrap {
+            height: 3px;
+            background: #1e1e1e;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 16px 28px 0;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #d32f2f, #ff6f00);
+            transition: width 1s ease-in-out;
+        }
+        .footer {
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #1e1e1e;
+            font-size: 0.78rem;
+            color: #444;
+            font-family: monospace;
+        }
+        .footer-source { color: #ff6f00; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+    // Data embedded from the backstage-component.yaml generated by apictl.py --emit-backstage
+    const COMPONENT = {
+        apiVersion: "backstage.io/v1alpha1",
+        kind: "Component",
+        metadata: {
+            name: "sample-orders-api",
+            description: "API for managing orders",
+            tags: ["orders", "health"]
+        },
+        spec: {
+            type: "service",
+            lifecycle: "production",
+            owner: "team-orders@example.com",
+            system: "api-platform"
+        }
+    };
+
+    // Readiness checks — map directly to rule IDs in apictl.py and .spectral.yaml
+    const READINESS_CHECKS = [
+        { id: "OPENAPI_PRESENT",       label: "OpenAPI 3.x spec present",           pass: true,  detail: "openapi: 3.0.1 — satisfies the OPENAPI_PRESENT rule." },
+        { id: "INFO_TITLE",            label: "API title defined",                   pass: true,  detail: "info.title: 'Sample Orders API' — satisfies INFO_TITLE." },
+        { id: "INFO_VERSION",          label: "Semantic versioning (x.y.z)",         pass: true,  detail: "info.version: '1.0.0' — valid semver, satisfies INFO_VERSION." },
+        { id: "PATHS",                 label: "At least one endpoint declared",      pass: true,  detail: "2 paths declared: /v1/orders, /v1/health." },
+        { id: "RESPONSES_HAVE_SCHEMA", label: "All responses declare content/schema",pass: true,  detail: "Both operations return application/json with inline schemas." },
+        { id: "SECURITY",              label: "Security schemes declared",           pass: true,  detail: "components.securitySchemes.bearerAuth (JWT) defined." },
+        { id: "api-contact-required",  label: "Contact/ownership info present",      pass: true,  detail: "info.contact defined with name and email — Spectral rule api-contact-required passes." },
+        { id: "api-path-versioning",   label: "Paths use /v{n}/ prefix",            pass: true,  detail: "All paths start with /v1/ — Spectral rule api-path-versioning passes." },
+        { id: "api-health-check",      label: "Health endpoint at /v1/health",       pass: true,  detail: "/v1/health declared — Spectral rule api-health-check-convention passes." },
+    ];
+
+    function MetaItem({ label, value }) {
+        const isLifecycle = label.toLowerCase() === "lifecycle";
+        return (
+            <div className="meta-item">
+                <div className="meta-label">{label}</div>
+                <div className={`meta-value${isLifecycle && value === "production" ? " lifecycle-production" : ""}`}>
+                    {value}
+                </div>
+            </div>
+        );
+    }
+
+    function CheckRow({ check, expanded, onToggle }) {
+        return (
+            <>
+                <div className={`check-row${expanded ? " expanded" : ""}`} onClick={onToggle}>
+                    <span className="check-icon">{check.pass ? "✓" : "✗"}</span>
+                    <span className="check-label">{check.label}</span>
+                    <span className="check-id">{check.id}</span>
+                </div>
+                {expanded && (
+                    <div className="check-detail">{check.detail}</div>
+                )}
+            </>
+        );
+    }
+
+    function ReadinessCard({ component, checks }) {
+        const [expandedId, setExpandedId] = React.useState(null);
+        const [barWidth, setBarWidth] = React.useState(0);
+
+        const passCount = checks.filter(c => c.pass).length;
+        const allPass = passCount === checks.length;
+        const pct = Math.round((passCount / checks.length) * 100);
+
+        React.useEffect(() => {
+            const t = setTimeout(() => setBarWidth(pct), 150);
+            return () => clearTimeout(t);
+        }, [pct]);
+
+        const handleToggle = (id) => {
+            setExpandedId(prev => prev === id ? null : id);
+        };
+
+        const { metadata, spec } = component;
+
+        return (
+            <div className="card">
+                <div className="card-header">
+                    <div>
+                        <div className="api-name">{metadata.name}</div>
+                        <div className="api-desc">{metadata.description}</div>
+                    </div>
+                    <span className={`badge ${allPass ? "badge-ready" : "badge-not-ready"}`}>
+                        {allPass ? "Ready for Catalog" : "Not Ready"}
+                    </span>
+                </div>
+
+                <div className="meta-grid">
+                    <MetaItem label="Owner"     value={spec.owner} />
+                    <MetaItem label="Lifecycle" value={spec.lifecycle} />
+                    <MetaItem label="System"    value={spec.system} />
+                    <MetaItem label="Type"      value={spec.type} />
+                </div>
+
+                <div className="progress-bar-wrap">
+                    <div className="progress-bar-fill" style={{ width: barWidth + "%" }} />
+                </div>
+
+                <div className="checks-section">
+                    <div className="checks-header">
+                        <span className="checks-title">Platform Readiness Checks</span>
+                        <span className="checks-score">{passCount} / {checks.length} passing</span>
+                    </div>
+                    {checks.map(check => (
+                        <CheckRow
+                            key={check.id}
+                            check={check}
+                            expanded={expandedId === check.id}
+                            onToggle={() => handleToggle(check.id)}
+                        />
+                    ))}
+                </div>
+
+                <div className="footer">
+                    <span>Generated by <span className="footer-source">apictl.py validate --emit-backstage</span></span>
+                    <span>{component.apiVersion}</span>
+                </div>
+            </div>
+        );
+    }
+
+    function App() {
+        return (
+            <div className="app-wrapper">
+                <div className="page-label">Backstage Component — API Readiness</div>
+                <ReadinessCard component={COMPONENT} checks={READINESS_CHECKS} />
+            </div>
+        );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+</script>
+</body>
+</html>

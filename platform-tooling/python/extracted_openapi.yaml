@@ -1,0 +1,46 @@
+openapi: 3.0.3
+info:
+  title: Extracted Legacy Orders API
+  description: Reverse-engineered OpenAPI document constructed from mitmproxy transaction
+    traces.
+  version: 1.0.0
+paths:
+  /api/Orders:
+    get:
+      summary: Extracted legacy GET endpoint
+      responses:
+        '200':
+          description: Detected status 200 response transaction.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    customer:
+                      type: string
+                    total:
+                      type: number
+    post:
+      summary: Extracted legacy POST endpoint
+      responses:
+        '400':
+          description: Detected status 400 response transaction.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  title:
+                    type: string
+                  status:
+                    type: integer
+                  errors:
+                    type: object
+                  traceId:
+                    type: string

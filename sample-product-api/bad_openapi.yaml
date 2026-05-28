@@ -1,0 +1,19 @@
+openapi: 3.0.1
+info:
+  version: "1"
+paths:
+  /orders:
+    get:
+      summary: List orders
+      responses:
+        '200':
+          description: OK
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+  /healthcheck:
+    get:
+      summary: health
+      responses: {}

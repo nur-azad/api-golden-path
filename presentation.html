@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEGO API Platform Strategy — Senior Engineering Presentation</title>
+    <style>
+        :root {
+            --primary: #d32f2f;
+            --accent: #ff6f00;
+            --bg-dark: #0a0a0a;
+            --card-bg: #141414;
+            --text-main: #f5f5f5;
+            --text-muted: #aaaaaa;
+            --border-color: #222222;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark); color: var(--text-main);
+            overflow: hidden; display: flex; flex-direction: column; height: 100vh;
+        }
+        header {
+            background-color: #000; padding: 15px 25px; display: flex;
+            justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); z-index: 10;
+        }
+        .logo-area { display: flex; align-items: center; gap: 10px; }
+        .logo-text { font-weight: bold; font-size: 1.2rem; letter-spacing: 1px; }
+        .nav-controls { display: flex; gap: 12px; align-items: center; }
+        .btn {
+            background: #161616; border: 1px solid var(--border-color); color: white;
+            padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+        }
+        .btn:hover { background: #222; border-color: var(--accent); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: #b71c1c; }
+        .slide-counter { font-size: 0.9rem; color: var(--text-muted); min-width: 70px; text-align: center; font-family: monospace; }
+
+        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        .slide-stage { flex: 1; position: relative; overflow: hidden; background: #0f0f0f; }
+        .slide {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 50px; display: flex; flex-direction: column; justify-content: flex-start;
+            opacity: 0; transform: scale(0.98); transition: all 0.3s ease-in-out; pointer-events: none; overflow-y: auto;
+        }
+        .slide.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+
+        .notes-panel {
+            width: 360px; background-color: #050505; border-left: 1px solid var(--border-color);
+            display: flex; flex-direction: column; transition: all 0.25s ease;
+        }
+        .notes-panel.collapsed { width: 0; border-left: none; }
+        .notes-header { padding: 18px; background: #000; font-weight: bold; font-size: 0.9rem; border-bottom: 1px solid var(--border-color); color: var(--accent); letter-spacing: 0.5px; }
+        .notes-content { white-space: pre-line; padding: 18px; font-size: 0.92rem; line-height: 1.6; color: #cccccc; overflow-y: auto; flex: 1; }
+
+        h2 { font-size: 2.4rem; margin-bottom: 25px; color: white; border-left: 5px solid var(--primary); padding-left: 18px; line-height: 1.2; }
+        p { margin-bottom: 18px; line-height: 1.6; color: #dddddd; font-size: 1.05rem; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 15px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 15px; }
+
+        .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 24px; border-top: 3px solid #333; }
+        .card.accent-card { border-top-color: var(--accent); }
+        .card h3 { margin-bottom: 12px; color: var(--accent); font-size: 1.25rem; }
+        .card ul { padding-left: 20px; color: #ccc; }
+        .card ul li { margin-bottom: 8px; }
+
+        .highlight-box { background: rgba(211,47,47,0.06); border: 1px solid rgba(211,47,47,0.25); border-left: 4px solid var(--primary); padding: 20px; border-radius: 4px; margin-top: 15px; }
+        .ide-window { background-color: #121212; border: 1px solid #252525; border-radius: 4px; font-family: "Consolas", monospace; overflow: hidden; margin-top: 15px; box-shadow: 0 12px 30px rgba(0,0,0,0.7); }
+        .ide-header { background-color: #1a1a1a; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #252525; }
+        .ide-dots { display: flex; gap: 6px; }
+        .ide-dot { width: 10px; height: 10px; border-radius: 50%; background: #333; }
+        .ide-content { padding: 20px; font-size: 0.88rem; line-height: 1.45; color: #d4d4d4; }
+        /* ==========================================================================
+        PRINT MEDIA RULES: Fixes the single-page cutoff and stacking bugs for PDF exports
+        ========================================================================== */
+        @media print {
+            /* 1. Reset root layouts to force a natural multi-page document flow */
+            html, body {
+                height: auto !important;
+                overflow: visible !important;
+                display: block !important;
+                background: #0a0a0a !important; 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important;         
+            }
+
+            .main-container, .slide-stage {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+
+            /* 2. Hide all interactive browser frame controls from the printout */
+            header, .nav-controls, .notes-panel, #btn-notes {
+                display: none !important;
+            }
+
+            /* 3. Transform absolute slides into distinct printable pages */
+            .slide {
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                width: 100% !important;
+                height: 100vh !important; /* Force each slide to fill exactly one PDF page */
+                opacity: 1 !important;    /* Make all slides visible to the print engine */
+                pointer-events: auto !important;
+                overflow: hidden !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: flex-start !important;
+                page-break-after: always !important; /* Forces a page break after every single slide */
+                break-after: page !important;
+            }
+            
+            /* Keep your code blocks readable and bounded on paper text sizes */
+            pre {
+                white-space: pre-wrap !important;
+                word-wrap: break-word !important;
+            }
+
+            /* ----------------------------------------------------------------------
+               SLIDE 3 COMPRESSIONS: Isolated fix to force bottom text onto Page 1
+               ---------------------------------------------------------------------- */
+            #slide-assumptions .grid-2 {
+                gap: 12px !important;
+                margin-top: 5px !important;
+            }
+
+            #slide-assumptions .card {
+                padding: 15px 20px !important;
+                margin-bottom: 0 !important;
+            }
+
+            #slide-assumptions .card h3 {
+                font-size: 1.15rem !important;
+                margin-bottom: 6px !important;
+            }
+
+            #slide-assumptions .card p {
+                font-size: 0.86rem !important;
+                line-height: 1.35 !important;
+                margin-bottom: 0 !important;
+            }
+
+            #slide-assumptions .highlight-box {
+                margin-top: 15px !important;
+                padding: 12px 20px !important;
+            }
+            
+            #slide-assumptions .highlight-box p {
+                font-size: 0.9rem !important;
+                line-height: 1.4 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <div class="logo-text">LEGO <span style="color:var(--accent)">API PLATFORM STRATEGY</span></div>
+        </div>
+        <div class="nav-controls">
+            <button class="btn" id="btn-notes">Speaker Notes</button>
+            <button class="btn" id="btn-prev">Prev</button>
+            <div class="slide-counter" id="counter">1 / 21</div>
+            <button class="btn btn-primary" id="btn-next">Next</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="slide-stage">
+
+            <!-- Slide 1: Title -->
+            <div class="slide active">
+                <div style="margin: auto 0; max-width: 900px; padding-top: 5vh;">
+                    <span style="color:var(--accent); font-weight: bold; letter-spacing: 2px; font-size: 0.95rem; text-transform: uppercase;">Engineering Board Case Presentation</span>
+                    <h1 style="font-size: 3.8rem; margin-top: 15px; margin-bottom: 25px; line-height: 1.1; font-weight: 800;">Building the API Golden Path at LEGO Scale</h1>
+                    <p style="font-size: 1.25rem; color: var(--text-muted); line-height: 1.6;">A platform engineering approach to help 250+ product squads build, document, and find APIs — without the platform team becoming a bottleneck.</p>
+                </div>
+            </div>
+
+            <!-- Slide 2: The Problem -->
+            <div class="slide">
+                <h2>The Real Problem: Fragmentation Overload</h2>
+                <div class="grid-2">
+                    <div>
+                        <p>Our distributed product squads face operational bottlenecks that slow down feature delivery:</p>
+                        <div class="card" style="margin-bottom: 15px;">
+                            <h3>Discovery Friction (51% Struggle)</h3>
+                            <p style="font-size:0.95rem; margin:0;">Engineers cannot locate existing cross-domain endpoints, leading to duplicate builds and fragmented architectures.</p>
+                        </div>
+                        <div class="card">
+                            <h3>Documentation Gaps (67% Frustrated)</h3>
+                            <p style="font-size:0.95rem; margin:0;">API definitions are frequently stale, lack standardised schemas, or remain hidden inside private repositories.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="highlight-box" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                            <h3 style="font-size: 1.4rem; color: white; margin-bottom: 15px;">The 38% Duplication Waste — a Real Example</h3>
+                            <p>At Maersk, working on a high-volume logistics platform, I watched eight separate squads independently build the same domain-event validation middleware. When we audited post-incident, we found over 10,000 lines of near-identical code spread across the codebase.</p>
+                            <p>A searchable API catalog would have surfaced the first version in minutes. The other seven squads would never have built it.</p>
+                            <p style="font-weight: bold; color: var(--accent); margin-top: 10px; margin-bottom: 0;">We cannot fix this through mandates — we must earn adoption by making the platform the easiest path.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 3: Key Assumptions -->
+            <div class="slide" id="slide-assumptions">
+                <h2>Key Assumptions — Stated Upfront</h2>
+                <p style="margin-bottom:20px;">The case invites explicit assumptions. These four shape every design decision that follows.</p>
+                <div class="grid-2">
+                    <div class="card accent-card">
+                        <h3>Backstage Is Already Running</h3>
+                        <p style="font-size:0.9rem;">The case states a developer portal based on Backstage already exists. I am <strong>extending adoption</strong> of what the team has already deployed — not introducing new infrastructure. The platform team has existing operational knowledge of it.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Demo Scoped to OpenAPI / REST</h3>
+                        <p style="font-size:0.9rem;">The case asks for 2–4 hours of effort and a lightweight prototype. I chose REST as the most prevalent protocol. The CLI architecture is pluggable — AsyncAPI for Kafka and graphql-inspector for GraphQL follow the identical validate → emit → register flow. The demo proves the pattern; the drivers are a sprint extension.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Champion Pool Already Exists</h3>
+                        <p style="font-size:0.9rem;">The developer survey shows 67% would value better discoverability and 58% are already aware of the platform. I am not building a champion network from zero — I am connecting engineers who already care to tooling that makes them successful.</p>
+                    </div>
+                    <div class="card accent-card">
+                        <h3>GitHub Actions as CI Standard</h3>
+                        <p style="font-size:0.9rem;">I assume GitHub is the primary code-hosting platform, enabling the CI gate pattern shown in the demo. For teams on GitLab or Azure DevOps, the same validation steps translate directly — different runner syntax, identical logic.</p>
+                    </div>
+                </div>
+                <div class="highlight-box" style="margin-top:18px;">
+                    <p style="margin-bottom:0;"><strong>What I have not assumed:</strong> that any squad will adopt this because we built it. Every design choice — local CLI, CI gate, Backstage templates — is optimised to earn adoption, not mandate it.</p>
+                </div>
+            </div>
+
+            <!-- Slide 4: Current State -->
+            <div class="slide">
+                <h2>Where We Stand: 35% Coverage, 780 APIs Unmanaged</h2>
+                <div class="grid-2">
+                    <div class="card accent-card">
+                        <h3>Current Baseline (35% Managed)</h3>
+                        <p>Out of an estimated 1,200 APIs across the organisation, only 420 services are currently integrated into our central gateway.</p>
+                        <p style="color: var(--primary); font-weight: bold; margin-top: 10px;">780 shadow services operate in isolation, creating security gaps and hidden architectural dependencies.</p>
+                    </div>
+                    <div class="card">
+                        <h3>12-Month Targets</h3>
+                        <p>We track migration progress with live metrics, quarter-over-quarter:</p>
+                        <ul style="font-size: 0.95rem; line-height: 1.8; margin-top: 10px;">
+                            <li><strong>Q1:</strong> Auto-discover shadow repos, build initial catalog.</li>
+                            <li><strong>Q2:</strong> Launch local CLI validation hooks for new builds.</li>
+                            <li><strong>Q3:</strong> Onboard 85 core domain squads.</li>
+                            <li><strong>Q4:</strong> Hit 80% total coverage (960 services managed).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 5: Philosophy -->
+            <div class="slide">
+                <h2>The Philosophy: Make the Right Thing Easy</h2>
+                <p>Enforcing rigid governance creates friction. Developers route around platforms that slow them down — keeping adoption stuck at 35%.</p>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3>1. Self-Service First</h3>
+                        <p style="font-size: 0.9rem;">Provide value at the engineer's workstation: instant linting, visual mocks, and automated scaffolding. No ticket needed.</p>
+                    </div>
+                    <div class="card">
+                        <h3>2. Fast Feedback</h3>
+                        <p style="font-size: 0.9rem;">Replace slow manual review boards with deterministic linting integrated directly into CI/CD. Errors caught in seconds, not days.</p>
+                    </div>
+                    <div class="card">
+                        <h3>3. Visibility as Incentive</h3>
+                        <p style="font-size: 0.9rem;">Make high-quality APIs visible through maturity scores — giving teams a concrete reason to care about their design quality.</p>
+                    </div>
+                </div>
+                <div class="highlight-box" style="margin-top: 20px;">
+                    <p style="margin-bottom: 0;"><strong>From experience:</strong> At Boyum IT, we encoded Clean Architecture conventions into a <code>.instructions.md</code> file that GitHub Copilot reads as context. Adoption hit 100% within the sprint — not because we mandated it, but because it made developers measurably faster and cut code review back-and-forth by ~30%. Same principle: build tools engineers actually want to use.</p>
+                </div>
+            </div>
+
+            <!-- Slide 6: Architecture -->
+            <div class="slide">
+                <h2>The Golden Path: Validate → Catalog → Discover</h2>
+                <p>The technical design catches contract issues early and gives teams full control across the lifecycle:</p>
+                <div class="ide-window">
+                    <div class="ide-content" style="font-family: monospace; font-size: 0.9rem; color: #818cf8;">
+                        [Developer Workstation: CLI Local Validation]<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;│<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;▼ (Pre-commit / Branch Check)<br>
+                        [GitHub Actions CI: Pluggable Rule Engine Gate]<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;├── REST/OpenAPI (Spectral Ruleset)<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;└── AsyncAPI / GraphQL (Custom Pluggable Linters)<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;│<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;▼ (Contract Passes)<br>
+                        [Backstage Portal Ingestion] ──► [Component Catalog]<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;│<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;▼ (Background Indexing)<br>
+                        [Searchable Catalog] &amp; [API Maturity Scoring]
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 7: CLI — wired to actual demo -->
+            <div class="slide">
+                <h2>Developer Experience: Catch Errors at Your Keyboard</h2>
+                <p>Catching contract issues before code leaves the machine keeps feedback loops fast and cheap. The output below is from <code>apictl.py</code> — the validator built for this case:</p>
+                <div class="ide-window">
+                    <div class="ide-header">
+                        <div class="ide-dots"><div class="ide-dot"></div><div class="ide-dot"></div></div>
+                        <div>platform-tooling/python — apictl.py validate</div>
+                    </div>
+                    <pre style="margin: 0; padding: 20px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.88rem; line-height: 1.5; color: #d4d4d4; overflow-x: auto; background: #121212;">
+            $ python apictl.py validate bad_openapi.yaml
+            <span style="color:#ef4444; font-weight: bold;">2 errors found</span>
+            <span style="color:#f59e0b; font-weight: bold;">5 warnings found</span>
+
+            <span style="color:#555555;">┌──────────────────────────┬──────────┬──────────────────────────────────────────────┐</span>
+            <span style="color:#555555;">│</span> ID                       <span style="color:#555555;">│</span> Severity <span style="color:#555555;">│</span> Message                                      <span style="color:#555555;">│</span>
+            <span style="color:#555555;">├──────────────────────────┼──────────┼──────────────────────────────────────────────┤</span>
+            <span style="color:#555555;">│</span> <span style="color:#ef4444;">INFO_TITLE               </span><span style="color:#555555;">│</span><span style="color:#ef4444;"> error    </span><span style="color:#555555;">│</span> info.title must be provided                  <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#ef4444;">RESPONSES_HAVE_SCHEMA    </span><span style="color:#555555;">│</span><span style="color:#ef4444;"> error    </span><span style="color:#555555;">│</span> Each operation must declare response content <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#f59e0b;">INFO_VERSION             </span><span style="color:#555555;">│</span><span style="color:#f59e0b;"> warning  </span><span style="color:#555555;">│</span> info.version should follow semver (x.y.z)    <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#f59e0b;">SECURITY                 </span><span style="color:#555555;">│</span><span style="color:#f59e0b;"> warning  </span><span style="color:#555555;">│</span> Declare securitySchemes in components        <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#f59e0b;">OPENTELEMETRY_TAG        </span><span style="color:#555555;">│</span><span style="color:#f59e0b;"> warning  </span><span style="color:#555555;">│</span> Add x-opentelemetry metadata                 <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#f59e0b;">PARAM_DESCRIPTIONS       </span><span style="color:#555555;">│</span><span style="color:#f59e0b;"> warning  </span><span style="color:#555555;">│</span> All parameters should include a description  <span style="color:#555555;">│</span>
+            <span style="color:#555555;">│</span> <span style="color:#f59e0b;">PATH_PREFIX              </span><span style="color:#555555;">│</span><span style="color:#f59e0b;"> warning  </span><span style="color:#555555;">│</span> Paths should use /api or /v prefix           <span style="color:#555555;">│</span>
+            <span style="color:#555555;">└──────────────────────────┴──────────┴──────────────────────────────────────────────┘</span></pre>
+                </div>
+                <p style="margin-top: 15px; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0;">The demo walkthrough runs this against both a non-compliant and a compliant spec — and shows the CI gate blocking the bad one while the good spec emits a Backstage component YAML.</p>
+            </div>
+
+            <!-- Slide 8: Multi-protocol -->
+            <div class="slide">
+                <h2>Not Just REST: Kafka, GraphQL, and More</h2>
+                <p>To scale across 250 autonomous squads, the validation layer must support the protocols teams actually use — without creating new barriers.</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Pluggable Validator Architecture</h3>
+                        <p style="font-size: 0.95rem;">The local CLI loads the right linter based on the repo configuration:</p>
+                        <ul style="font-size: 0.9rem; padding-left:20px; margin-top:10px;">
+                            <li><strong>REST:</strong> Spectral parses <code>openapi.yaml</code>.</li>
+                            <li><strong>Event Streams:</strong> AsyncAPI driver validates Kafka schemas.</li>
+                            <li><strong>GraphQL:</strong> graphql-inspector catches breaking schema changes.</li>
+                        </ul>
+                    </div>
+                    <div class="card accent-card">
+                        <h3>Team-Level Customisation</h3>
+                        <p style="font-size:0.95rem;">Product squads extend the central ruleset with local rules — adding domain-specific checks without forking the platform or waiting for the core team.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 9: CI Gates -->
+            <div class="slide">
+                <h2>CI as Safety Net: No Manual Review Boards</h2>
+                <p>The local CLI helps developers iterate quickly. The CI gate is the final automated check before code reaches main — no human in the loop.</p>
+                <div class="card">
+                    <h3>What the Gate Does</h3>
+                    <ul style="font-size: 0.95rem; line-height: 1.8;">
+                        <li><strong>PR checks:</strong> Every pull request automatically runs the full validation ruleset.</li>
+                        <li><strong>Hard gate:</strong> Builds fail if contract errors are present — broken specs cannot reach production branches.</li>
+                        <li><strong>Drift detection:</strong> CI alerts if runtime behaviour starts to diverge from the declared API schema.</li>
+                    </ul>
+                </div>
+                <div class="highlight-box" style="margin-top: 20px;">
+                    <h3 style="color: white; margin-bottom: 12px; font-size: 1.1rem;">How Drift Detection Works</h3>
+                    <p style="font-size: 0.95rem; margin: 0; line-height: 1.6;">A team adds a new response field to an API (e.g., <code style="background: rgba(255,111,0,0.1); padding: 2px 6px; border-radius: 2px;">discount_code</code>) but forgets to update the OpenAPI spec. The CI monitor catches this mismatch within the hour and alerts the team: "Your spec says [id, customer_id, total_amount, status] but production is returning [id, customer_id, total_amount, status, discount_code]." The team either updates the spec or reverts the code. Downstream consumers never experience surprise breaking changes.</p>
+                </div>
+            </div>
+
+            <!-- Slide 10: Backstage -->
+            <div class="slide">
+                <h2>Backstage: Templates, Catalog, Dependency Graph</h2>
+                <p>We use Backstage as the portal layer — an interconnected service graph, not a static API list.</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Software Templates</h3>
+                        <p style="font-size:0.95rem;">New services spin up via Backstage templates that include standard CI config, default linting rules, and the validation CLI pre-wired — the Golden Path is the default path.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Dependency Graph</h3>
+                        <p style="font-size:0.95rem;">Backstage tracks which squads consume which endpoints — giving the platform team full visibility into cross-domain dependencies and blast radius of any breaking change.</p>
+                    </div>
+                </div>
+                <div class="highlight-box" style="margin-top: 20px;">
+                    <p style="margin-bottom: 0;"><strong>Honest note:</strong> I haven't operated Backstage in production yet — my familiarity is through architecture research and hands-on work with the catalog and template concepts. I'd treat month 1 as a structured onboarding sprint: pairing with whoever on the team knows it best before making architectural decisions.</p>
+                </div>
+            </div>
+
+            <!-- Slide 11: Scaling -->
+            <div class="slide">
+                <h2>How 8 Engineers Support 2,000 Developers</h2>
+                <p>A small core platform team cannot hand-hold every squad. The model is about leverage, not headcount:</p>
+                <div class="grid-3">
+                    <div class="card">
+                        <h3>Tier 1: Self-Service (80%)</h3>
+                        <p style="font-size: 0.88rem;">Automated hooks and Backstage templates guide developers through setup with zero hands-on support from the platform team.</p>
+                    </div>
+                    <div class="card accent-card">
+                        <h3>Tier 2: InnerSource (15%)</h3>
+                        <p style="font-size: 0.88rem;">An internal champion network builds and contributes custom validation plugins back to the platform — the team scales through the community, not headcount.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Tier 3: Advisory (5%)</h3>
+                        <p style="font-size: 0.88rem;">Core team involvement reserved for critical migrations and complex domain designs where the stakes are highest.</p>
+                    </div>
+                </div>
+                <!-- Live Dashboard Integration Link -->
+                <div style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.82rem; color: var(--text-muted); background: rgba(255,111,0,0.04); border: 1px dashed rgba(255,111,0,0.25); padding: 10px 18px; border-radius: 4px; margin-top: 20px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent); box-shadow: 0 0 8px var(--accent);"></span>
+                        <span>Operational Scale Demo: <strong style="color: var(--text-main);">dashboard.html</strong></span>
+                    </div>
+                    <a href="dashboard.html" target="_blank" style="color: var(--accent); font-weight: bold; text-decoration: none; border-bottom: 1px solid var(--accent); padding-bottom: 1px;">Launch Live Simulation ↗</a>
+                </div>
+            </div>
+
+            <!-- Slide 12: Auto-discovery -->
+            <div class="slide">
+                <h2>Auto-Discovery: We Come to Teams, Not the Other Way Round</h2>
+                <p>The developer survey showed a 42% portal awareness gap. Rather than waiting for teams to self-register, the platform finds them first.</p>
+                <div class="card">
+                    <h3>Automated Repository Discovery</h3>
+                    <p style="font-size: 0.95rem;">A background scanner monitors organisation repos for untracked <code>openapi.yaml</code> files and automatically opens a registration PR for the owning squad:</p>
+                    <div class="ide-window" style="margin-top:10px;">
+                        <div class="ide-content" style="font-size:0.8rem; line-height:1.4;">
+                            [Background Scanner]<br>
+                            Found untracked openapi.yaml in repo 'squad-checkout-service'<br>
+                            PR opened: "Register Checkout API with the platform catalog"<br>
+                            One approval away from being discoverable by 250 squads.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 13: Semantic Search — future direction -->
+            <div class="slide">
+                <h2>Future Direction: Smarter API Search</h2>
+                <p>Keyword search breaks when teams use different names for the same concept — searching "payment" misses an endpoint called <code>/v1/charges</code>. Longer-term, semantic search would help teams find existing APIs even when terminology differs.</p>
+                <div class="grid-2">
+                    <div class="card accent-card">
+                        <h3>How It Would Work</h3>
+                        <ul style="font-size: 0.9rem; padding-left: 15px;">
+                            <li><strong>Schema Extraction:</strong> Read OpenAPI description fields during catalog ingestion.</li>
+                            <li><strong>Vectorisation:</strong> Generate text embeddings from endpoint descriptions.</li>
+                            <li><strong>Semantic Store:</strong> Index vectors for intent-based querying.</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Phased Approach</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-muted);">Start with what Backstage already provides before investing in vector infrastructure:</p>
+                        <p style="font-size: 0.85rem; line-height: 1.5;"><strong>Months 1–3:</strong> Backstage metadata search.<br><strong>Months 4–6:</strong> Spike to measure indexing cost vs. accuracy delta.<br><strong>Months 7–12:</strong> Decision point — invest or defer based on spike results.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 14: MCP / AI — future direction -->
+            <div class="slide">
+                <h2>Future Direction: AI-Aware Platform</h2>
+                <p>As squads increasingly use AI coding assistants, the platform can expose structured API context to those tools — making suggestions more accurate without requiring engineers to paste specs manually. Interesting direction; not a day-one deliverable.</p>
+                <div class="highlight-box">
+                    <h3>The MCP Server Pattern</h3>
+                    <p style="font-size: 0.95rem; line-height: 1.6; margin-top: 5px;">A <strong>Model Context Protocol (MCP) Server</strong> on top of the Backstage catalog would let IDE assistants query the API catalog safely. We'd treat this as a second-half-of-year exploration once catalog coverage is sufficient to make it valuable.</p>
+                    <div class="ide-window" style="margin-top: 10px;">
+                        <div class="ide-content" style="font-family: monospace; font-size: 0.8rem; color: #10b981;">
+                            [Developer IDE Assistant] ──(MCP Query)──► [Portal MCP Server]<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Backstage Catalog Lookup]<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+                            [IDE Response]: "Found /v2/payments — owned by Squad-Checkout."
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 15: Documentation -->
+            <div class="slide">
+                <h2>Docs from Code: Auto-Generated, Always Current</h2>
+                <p>Developers won't maintain separate markdown docs — that's a fact. The pipeline generates documentation from the contract file automatically, keeping it accurate by construction.</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Interactive Try-It Sandboxes</h3>
+                        <p style="font-size: 0.9rem;">Every registered API automatically gets an isolated sandbox — client teams run test requests without writing any code.</p>
+                    </div>
+                    <div class="card accent-card">
+                        <h3>Generated from the Spec</h3>
+                        <p style="font-size: 0.9rem;">The build pipeline uses schema properties to generate example payloads, integration examples, and error code documentation — derived from the same source as the validation rules.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 16: Scorecards -->
+            <div class="slide">
+                <h2>API Scorecards: Visibility Drives Quality</h2>
+                <p>A catalog is only useful if developers trust that listed endpoints are reliable. Public quality scores create that trust — and give teams a concrete reason to care.</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>What the Scorecard Shows</h3>
+                        <p style="font-size:0.9rem;">Clear quality signals per API:</p>
+                        <ul style="font-size:0.85rem; padding-left:15px; margin-top:5px;">
+                            <li><strong>Lifecycle status:</strong> Stable, beta, or deprecated.</li>
+                            <li><strong>Error rate:</strong> Real-time availability and contract drift.</li>
+                            <li><strong>Consumer count:</strong> How many squads depend on this API.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="ide-window">
+                            <div class="ide-header"><div>API Quality Card</div></div>
+                            <div class="ide-content" style="font-size:0.8rem; line-height: 1.8;">
+                                <strong>Inventory Service API v3</strong><br>
+                                Quality Score: <span style="color:#10b981;">96 / 100</span><br><br>
+                                <span style="color:#10b981;">✓</span> Lifecycle: Production<br>
+                                <span style="color:#10b981;">✓</span> Security: OAuth2 Configured<br>
+                                <span style="color:#10b981;">✓</span> Documentation: Auto-generated from spec<br>
+                                <span style="color:#10b981;">✓</span> Semantic versioning: v3.1.2<br>
+                                <span style="color:#10b981;">✓</span> Observability: OpenTelemetry tags present<br>
+                                <span style="color:#10b981;">✓</span> Availability: 99.95% (last 30 days)<br>
+                                <span style="color:#10b981;">✓</span> Active consumers: 32 squads<br>
+                                <span style="color:#10b981;">✓</span> Schema compliance: 100% (no drift)
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-family: monospace; font-size: 0.82rem; color: var(--text-muted); background: rgba(255,111,0,0.04); border: 1px dashed rgba(255,111,0,0.25); padding: 10px 18px; border-radius: 4px; margin-top: 15px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent); box-shadow: 0 0 8px var(--accent);"></span>
+                                <span>Quality Engine Demo: <strong style="color: var(--text-main);">api-readiness.html</strong></span>
+                            </div>
+                            <a href="api-readiness.html" target="_blank" style="color: var(--accent); font-weight: bold; text-decoration: none; border-bottom: 1px solid var(--accent); padding-bottom: 1px;">Launch Scorecard Demo ↗</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 17: Migration -->
+            <div class="slide">
+                <h2>Migrating the Other 65%: Low Friction, Phased</h2>
+                <p>We cannot rewrite 780 legacy APIs overnight. The strategy meets teams where they are and reduces friction at every step:</p>
+                <div class="card">
+                    <ul style="font-size: 0.95rem; line-height: 1.8;">
+                        <li><strong>Phase 1 — Discover and Document (Month 1–2):</strong> Background repo scanners find shadow endpoints and build a low-touch baseline inventory.</li>
+                        <li><strong>Phase 2 — Light Ingestion (Month 3–5):</strong> Accept partial specs with basic owner tags — register services without requiring full compliance rewrites up front.</li>
+                        <li><strong>Phase 3 — Golden Path Alignment (Month 6–12):</strong> Automated scaffolding tools help legacy squads upgrade their specs at their own pace.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Slide 18: 90 Days -->
+            <div class="slide">
+                <h2>First 90 Days: Discovery, Tooling, Early Wins</h2>
+                <p>Focusing on foundational reliability in the first 90 days establishes the base everything else builds on.</p>
+                <div class="grid-3">
+                    <div class="card accent-card">
+                        <h3>Month 1: Discovery</h3>
+                        <p style="font-size:0.85rem;">Deploy background repo scanners. Build the initial catalog in Backstage. Identify the 15 highest-value shadow APIs to prioritise first.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Month 2: Tooling</h3>
+                        <p style="font-size:0.85rem;">Ship the local validation CLI. Run a spike to evaluate whether semantic search adds enough value to justify the infrastructure investment.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Month 3: First Wins</h3>
+                        <p style="font-size:0.85rem;">Roll out the GitHub Actions validation gate. Onboard the first champion cohort. Publish adoption metrics to the wider team.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 19: Month 4-12 -->
+            <div class="slide">
+                <h2>Month 4–12: Champions, Self-Service, 80% Target</h2>
+                <p>Once the automated loops are running, focus shifts to scaling adoption across the wider engineering organisation.</p>
+                <div class="card">
+                    <ul style="font-size:0.95rem; line-height:1.8;">
+                        <li><strong>InnerSource Expansion (Month 4–6):</strong> Train decentralised champions to build custom linting plugins and grow rule coverage without central team involvement.</li>
+                        <li><strong>Self-Service Scale (Month 7–9):</strong> Scale onboarding flows to target 180 registered squads. Track adoption weekly, remove friction wherever drop-off occurs.</li>
+                        <li><strong>80% Target (Month 10–12):</strong> Complete legacy migrations to bring 80% of organisation APIs under active management. Publish a year-one retrospective.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Slide 20: Risks -->
+            <div class="slide">
+                <h2>What Could Go Wrong and How We Prevent It</h2>
+                <p>Platform tools only work if developers use them. Anticipating friction is part of the design.</p>
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Risk: Validation Slows Builds</h3>
+                        <p style="font-size:0.9rem; color:var(--text-muted);">Developers bypass tools that add noticeable latency to their workflow.</p>
+                        <p style="font-size:0.9rem; margin-top:5px; color:#10b981;"><strong>Mitigation:</strong> Keep local validation sub-second — non-negotiable design constraint. Provide auto-fix suggestions so failures don't become blockers.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Risk: Support Overload</h3>
+                        <p style="font-size:0.9rem; color:var(--text-muted);">An 8-person team can be overwhelmed by tickets from 2,000 engineers during a rollout.</p>
+                        <p style="font-size:0.9rem; margin-top:5px; color:#10b981;"><strong>Mitigation:</strong> Error messages that explain the fix, not just the failure. Use the Tier 2 champion network to handle first-line questions before they reach the core team.</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="card">
+                        <h3>Risk: Adoption Stalls Without Visible Early Wins</h3>
+                        <p style="font-size:0.9rem; color:var(--text-muted);">Teams hear about the platform but don't see value for their own work, so they avoid it.</p>
+                        <p style="font-size:0.9rem; margin-top:5px; color:#10b981;"><strong>Mitigation:</strong> Identify 15 teams in pain (the 51% struggling with discovery) in Month 1. Make them successful and visible. Word spreads when peers see a team solve their problem. Adoption follows credibility, not mandates.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Risk: Backstage Operational Overhead</h3>
+                        <p style="font-size:0.9rem; color:var(--text-muted);">A new platform to operate could become a bottleneck if the core team gets pulled into constant maintenance.</p>
+                        <p style="font-size:0.9rem; margin-top:5px; color:#10b981;"><strong>Mitigation:</strong> Treat Month 1 as a structured onboarding sprint with the existing Baseplate team. Clarify on-call procedures and runbooks up front. The platform should be self-healing wherever possible — if a validation rule breaks, revert it automatically and alert the author.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Slide 21: Conclusion -->
+            <div class="slide">
+                <span style="color:var(--accent); font-weight:bold; letter-spacing:1px; font-size:1rem; text-transform:uppercase;">The Strategic Conclusion</span>
+                <h2 style="margin-top:12px;">Breaking Fragmentation at Scale</h2>
+                <p>The mission isn't just building a catalog—it's breaking down the architectural fragmentation that holds our 250 squads back.</p>
+                
+                <div class="grid-2">
+                    <div class="card accent-card">
+                        <h3>Three Concrete Outcomes</h3>
+                        <ul style="font-size: 0.95rem; padding-left:15px; line-height:1.8; margin-top:10px;">
+                            <li><strong>Fast Feedback:</strong> Errors caught in milliseconds at the keyboard, not days in review.</li>
+                            <li><strong>Seamless Discovery:</strong> Active, interconnected APIs replace stale silos and tribal knowledge.</li>
+                            <li><strong>Leveraged Scaling:</strong> 8 engineers + Tier 1/2/3 enablement unlocks 2,000 developers without bottlenecks.</li>
+                        </ul>
+                    </div>
+                    <div class="highlight-box" style="display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <h3 style="color:white; margin-bottom:12px; font-size:1.15rem;">The Closing Principle</h3>
+                            <p style="font-size:0.95rem; line-height:1.6; font-style:italic; margin-bottom:14px;">"We cannot force compliance across 250 autonomous teams. Instead, we scale by making the Golden Path the easiest path to production. Tooling that earns adoption builds a self-sustaining ecosystem."</p>
+                        </div>
+                        <p style="font-size:0.9rem; color:var(--accent); font-weight:600; margin:0;">That ecosystem is built on Tier 1 self-service (80%), Tier 2 champions (15%), and Tier 3 core team (5%) — which is how we scale reliably.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="notes-panel" id="notes-panel">
+            <div class="notes-header">SPEAKER NOTES</div>
+            <div class="notes-content" id="notes-content">Loading...</div>
+        </div>
+    </div>
+
+<script>
+    const slides = document.querySelectorAll('.slide');
+    const counter = document.getElementById('counter');
+    const notesContent = document.getElementById('notes-content');
+    const notesPanel = document.getElementById('notes-panel');
+    const btnNext = document.getElementById('btn-next');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNotes = document.getElementById('btn-notes');
+
+    let currentIdx = 0;
+
+
+const speakerNotes = [
+    /* Slide 1: Title Slide */
+    "* Introduce presenter (Nur, 7 YOE) and the mission to build a frictionless API Golden Path at LEGO scale[cite: 5].\n" +
+    "* Connect personal motivation of removing barriers to the goal of helping 250+ squads work faster[cite: 5].\n" +
+    "* Emphasize target: moving from forced governance to earning adoption by making the platform the easiest path[cite: 5].",
+
+    /* Slide 2: The Real Problem - Fragmentation Overload */
+    "* Highlight concrete developer survey data: 51% face discovery friction, 67% encounter stale documentation[cite: 5].\n" +
+    "* Detail the impact: 38% duplication rate across squads rebuilding existing endpoints[cite: 5].\n" +
+    "* Share the Maersk middleware example (8 teams, 10k lines of duplicate code) to prove the cost of missing cataloging[cite: 5].",
+
+    /* Slide 3: Key Assumptions - Stated Upfront */
+    "* Establish structural baselines: Backstage is already running, and the ecosystem uses GitHub Actions[cite: 5].\n" +
+    "* Scope the prototype: Deep dive into REST/OpenAPI, with an inherently pluggable architecture for Kafka/GraphQL[cite: 5].\n" +
+    "* Leverage a warm audience: 58% of engineers are already aware of the platform and 67% want better discovery[cite: 5].",
+
+    /* Slide 4: Where We Stand - 35% Coverage, 780 APIs Unmanaged */
+    "* Review current organization baseline: Only 420 out of an estimated 1,200 APIs (35%) are centrally managed[cite: 5].\n" +
+    "* Highlight the risk of 780 shadow services creating hidden architectural dependencies and security gaps[cite: 5].\n" +
+    "* Introduce the 12-month roadmap targets to systematically achieve 80% total organization coverage[cite: 5].",
+
+    /* Slide 5: The Philosophy - Make the Right Thing Easy */
+    "* Outline the core strategy: Rigid governance forces teams to route around the platform; we must reduce friction instead[cite: 5].\n" +
+    "* Explain the three pillars: Self-Service First, Fast Feedback via CI, and Visibility as an Incentive[cite: 5].\n" +
+    "* Share the Boyum IT Copilot context file example to prove that speed drives 100% organic adoption[cite: 5].",
+
+    /* Slide 6: The Golden Path - Validate → Catalog → Discover */
+    "* Trace the technical data flow: Local developer validation, automated CI gate check, and Backstage ingestion[cite: 5].\n" +
+    "* Detail validation touchpoints: Shifting left to catch contract defects at design-time rather than late in production[cite: 5].\n" +
+    "* Explain the end-user outcome: Instant search, clear ownership mapping, and sandbox environments[cite: 5].",
+
+    /* Slide 7: Developer Experience - Catch Errors at Your Keyboard */
+    "* Walk through the custom `apictl` Python CLI built for this case presentation[cite: 5].\n" +
+    "* Detail the sub-second output rules: Hard errors (missing titles/schemas) vs. soft warnings (semver/OpenTelemetry)[cite: 5].\n" +
+    "* Contrast instant developer desktop loops with traditional, slow manual architecture review boards[cite: 5].",
+
+    /* Slide 8: Not Just REST - Kafka, GraphQL, and More */
+    "* Address multi-protocol requirements across 250 autonomous squads[cite: 5].\n" +
+    "* Explain driver scaling: Spectral for REST, AsyncAPI for Kafka streams, and graphql-inspector for GraphQL schemas[cite: 5].\n" +
+    "* Emphasize extensibility: Product squads can write custom domain rules without needing to fork the platform[cite: 5].",
+
+    /* Slide 9: CI as Safety Net - No Manual Review Boards */
+    "* Explain automated enforcement: Every PR runs full validation to block non-compliant API specs from reaching main[cite: 5].\n" +
+    "* Introduce continuous automated drift detection to catch mismatches between live production responses and contracts[cite: 5].\n" +
+    "* Illustrate with the `discount_code` scenario: Keeping downstream consumers safe from surprise breaking changes[cite: 5].",
+
+    /* Slide 10: Backstage - Templates, Catalog, Dependency Graph */
+    "* Highlight Backstage features: Software templates for automated scaffolding and cross-domain dependency graphs[cite: 5].\n" +
+    "* Provide transparent onboarding commitment: Month 1 pairing sprint with the core team to understand portal customizations[cite: 5].\n" +
+    "* Reinforce the design methodology: Learn first, architect second[cite: 5].",
+
+    /* Slide 11: How 8 Engineers Support 2,000 Developers */
+    "* Solve the team scaling problem via a leveraged, three-tier engineering enablement pyramid[cite: 5].\n" +
+    "* Breakdown: Tier 1 Self-Service (80%), Tier 2 InnerSource Champions (15%), and Tier 3 Core Advisory (5%)[cite: 5].\n" +
+    "* Pivot metrics away from strict enforcement and focus on weekly adoption tracking and friction removal[cite: 5].",
+
+    /* Slide 12: Auto-Discovery - We Come to Teams, Not the Other Way Round */
+    "* Resolve the 42% portal awareness gap by taking a proactive approach to legacy repository ingestion[cite: 5].\n" +
+    "* Detail the automated scanner pattern: Locating untracked specs and generating zero-touch registration PRs for squads[cite: 5].\n" +
+    "* Shift the platform team paradigm from 'build and wait' to actively finding and highlighting squad work[cite: 5].",
+
+    /* Slide 13: Future Direction - Smarter API Search */
+    "* Identify keyword search limitations when different domains use separate terms for identical concepts[cite: 5].\n" +
+    "* Introduce intent-based semantic search via text embeddings generated during catalog ingestion[cite: 5].\n" +
+    "* Present a disciplined, phased evaluation plan to measure infrastructure cost vs. accuracy value before building[cite: 5].",
+
+    /* Slide 14: Future Direction - AI-Aware Platform */
+    "* Discuss exposing structured API catalog context directly to developer AI coding assistants like Copilot and Claude[cite: 5].\n" +
+    "* Outline the Model Context Protocol (MCP) server design pattern to fetch real-time contract context safely[cite: 5].\n" +
+    "* Clarify roadmap scheduling: Target as a second-half exploration after achieving high baseline catalog coverage[cite: 5].",
+
+    /* Slide 15: Docs from Code - Auto-Generated, Always Current */
+    "* Enforce the core documentation rule: Generate reference material automatically from code to eliminate human upkeep[cite: 5].\n" +
+    "* Introduce interactive sandboxes for testing API contracts live in the portal without writing client code[cite: 5].\n" +
+    "* Eliminate documentation drift by making the OpenAPI spec the absolute single source of architectural truth[cite: 5].",
+
+    /* Slide 16: API Scorecards - Visibility Drives Quality */
+    "* Build catalog trust by attaching public, objective quality scorecards to every registered service[cite: 5].\n" +
+    "* Review the 8 specific scoring dimensions, including lifecycle, compliance, security, and open telemetry tags[cite: 5].\n" +
+    "* Reiterate that visible data motivates teams to improve designs organically without central management mandates[cite: 5].",
+
+    /* Slide 17: Migrating the Other 65% - Low Friction, Phased */
+    "* Acknowledge that 780 legacy APIs cannot be refactored instantly; meet teams where their current systems are[cite: 5].\n" +
+    "* Define three phased ingestion steps: Discover/Document, Light Ingestion (partial specs), and Golden Path alignment[cite: 5].\n" +
+    "* Lower the cost of participation so squads can transition at their own pace without delivery disruptions[cite: 5].",
+
+    /* Slide 18: First 90 Days - Discovery, Tooling, Early Wins */
+    "* Detail the immediate operational plan: Month 1 (Discovery & Cataloging), Month 2 (CLI Tooling Rollout)[cite: 5].\n" +
+    "* Plan Month 3: Deploy the GitHub Actions gate and onboard the initial pilot cohort of developer champions[cite: 5].\n" +
+    "* Establish early visibility and build platform credibility by solving immediate pain points for the first 15 squads[cite: 5].",
+
+    /* Slide 19: Month 4–12: Champions, Self-Service, 80% Target */
+    "* Detail scale phase: Months 4-6 (InnerSource plugin scaling), Months 7-9 (Targeting 180 squads via friction tracking)[cite: 5].\n" +
+    "* Final phase: Months 10-12 wrapping up legacy migrations to hit the targeted 80% total managed API threshold[cite: 5].\n" +
+    "* Emphasize data-driven iteration: Continually audit time-to-register metrics and registration completion drop-offs[cite: 5].",
+
+    /* Slide 20: What Could Go Wrong and How We Prevent It */
+    "* Address 4 critical implementation risks directly with transparent, pre-engineered technical mitigations[cite: 5].\n" +
+    "* Mitigate build slow-downs with sub-second local linting execution and automated rule fixes[cite: 5].\n" +
+    "* Mitigate support overhead by utilizing human-readable errors and leveraging the Tier 2 champion framework[cite: 5].",
+
+    /* Slide 21: Breaking Fragmentation at Scale (Closing) */
+    "* Summarize the concrete outcomes: Millisecond feedback loops, active endpoint discovery, and high team leverage[cite: 5].\n" +
+    "* Deliver the closing strategic principle: Platforms scale by earning organic adoption and making the Golden Path easy[cite: 5].\n" +
+    "* Transition smoothly away from slides into the live tool demos and open the floor to board questions[cite: 5]."
+];
+    function updateSlide(idx) {
+        // Safe bounds checking
+        if (idx < 0 || idx >= slides.length) return;
+        
+        slides.forEach(s => s.classList.remove('active'));
+        slides[idx].classList.add('active');
+        counter.innerText = `${idx + 1} / ${slides.length}`;
+        notesContent.innerHTML = speakerNotes[idx] || "No notes for this slide.";
+    }
+
+    btnNext.addEventListener('click', () => { if (currentIdx < slides.length - 1) { currentIdx++; updateSlide(currentIdx); } });
+    btnPrev.addEventListener('click', () => { if (currentIdx > 0) { currentIdx--; updateSlide(currentIdx); } });
+    btnNotes.addEventListener('click', () => { notesPanel.classList.toggle('collapsed'); });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { if (currentIdx < slides.length - 1) { currentIdx++; updateSlide(currentIdx); } }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { if (currentIdx > 0) { currentIdx--; updateSlide(currentIdx); } }
+    });
+
+    // Initialize layout
+    updateSlide(0);
+</script>
+</body>
+</html>

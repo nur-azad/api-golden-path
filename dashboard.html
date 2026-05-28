@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEGO API Golden Path — Adoption Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #161616 100%);
+            padding: 30px; min-height: 100vh; color: #f5f5f5;
+        }
+        .dashboard { max-width: 1500px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            margin-bottom: 30px; text-align: left; border-bottom: 2px solid #d32f2f;
+            padding-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;
+        }
+        .header-text h1 { font-size: 2.2rem; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
+        .header-text h1 span { color: #ff6f00; }
+        .header-text p { font-size: 1rem; color: #aaaaaa; margin-top: 5px; }
+        .live-indicator {
+            background: rgba(213, 47, 47, 0.1); border: 1px solid #d32f2f; padding: 6px 14px;
+            border-radius: 4px; font-size: 0.85rem; color: #ff3333; font-family: monospace;
+            display: flex; align-items: center; gap: 8px; font-weight: bold;
+        }
+        .pulse-dot { width: 8px; height: 8px; background: #ff3333; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+
+        /* Metric Cards */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; margin-bottom: 25px;
+        }
+        .metric-card {
+            background: #141414; border-radius: 4px; padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 1px solid #222; border-left: 4px solid #d32f2f;
+        }
+        .metric-card.accent-card { border-left-color: #ff6f00; }
+        .metric-title { font-size: 0.8rem; color: #aaaaaa; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .metric-value { font-size: 2.2rem; font-weight: bold; color: #ffffff; margin: 8px 0; font-family: monospace; }
+        .metric-sub { font-size: 0.85rem; color: #ff6f00; display: flex; align-items: center; gap: 4px; }
+        .metric-bar { width: 100%; height: 4px; background: #252525; border-radius: 2px; overflow: hidden; margin-top: 10px; }
+        .metric-bar-fill { height: 100%; background: #ff6f00; width: 0%; transition: width 1.2s ease-in-out; }
+
+        /* Charts */
+        .main-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 25px; }
+        .charts-container { display: grid; grid-template-columns: 1fr; gap: 25px; }
+        .chart-block { background: #141414; border-radius: 4px; padding: 24px; border: 1px solid #222; }
+        .chart-block h3 { margin-bottom: 20px; font-size: 1.1rem; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Side Panel */
+        .side-panel { display: flex; flex-direction: column; gap: 25px; }
+        .timeline-panel { background: #141414; border-radius: 4px; padding: 24px; border: 1px solid #222; flex: 1; }
+        .timeline-panel h3 { margin-bottom: 20px; font-size: 1.1rem; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+        .timeline-item { margin-bottom: 18px; }
+        .timeline-meta { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px; }
+        .timeline-label { font-weight: 600; color: #ff6f00; }
+        .timeline-track { width: 100%; height: 20px; background: #222; border-radius: 3px; overflow: hidden; position: relative; }
+        .timeline-progress { height: 100%; background: linear-gradient(90deg, #d32f2f 0%, #ff6f00 100%); display: flex; align-items: center; padding-left: 10px; font-size: 0.75rem; font-weight: bold; color: white; width: 0%; transition: width 1.2s ease-in-out; }
+
+        /* Insights */
+        .insights-panel { background: #141414; border-radius: 4px; padding: 24px; border: 1px solid #222; border-top: 4px solid #ff6f00; }
+        .insights-panel h3 { margin-bottom: 20px; font-size: 1.1rem; text-transform: uppercase; color: #ffffff; }
+        .insights-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; list-style: none; }
+        .insight-item { padding: 20px; background: #1c1c1c; border-radius: 4px; border-left: 3px solid #d32f2f; }
+        .insight-item h4 { font-size: 1rem; color: #ff6f00; margin-bottom: 8px; font-weight: 600; }
+        .insight-item p { font-size: 0.85rem; color: #cccccc; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+
+        <div class="header">
+            <div class="header-text">
+                <h1>LEGO API <span>Golden Path</span> Dashboard</h1>
+                <p>Live adoption tracking — 12-month rollout target</p>
+            </div>
+            <div class="live-indicator">
+                <div class="pulse-dot"></div> SIMULATION ACTIVE
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">API Registration Coverage</div>
+                <div class="metric-value" id="val-coverage">80%</div>
+                <div class="metric-sub" style="color:#ff6f00;">Year 1 Target</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="80" style="background: #d32f2f;"></div></div>
+            </div>
+            <div class="metric-card accent-card">
+                <div class="metric-title">Avg API Quality Score</div>
+                <div class="metric-value">85/100</div>
+                <div class="metric-sub" style="color:#10b981;">+45 expected after CLI rollout</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="85" style="background: #ff6f00;"></div></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">Time to Register an API</div>
+                <div class="metric-value">&lt; 5 Min</div>
+                <div class="metric-sub" style="color:#aaaaaa;">Validated locally, registered via PR</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="95" style="background: #d32f2f;"></div></div>
+            </div>
+            <div class="metric-card accent-card">
+                <div class="metric-title">Squads on the Platform</div>
+                <div class="metric-value">180/250</div>
+                <div class="metric-sub" style="color:#ff6f00;">72% — Q4 target</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="72" style="background: #ff6f00;"></div></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">APIs with CI Validation</div>
+                <div class="metric-value">50%</div>
+                <div class="metric-sub" style="color:#10b981;">Target: all registered APIs</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="50" style="background: #d32f2f;"></div></div>
+            </div>
+            <div class="metric-card accent-card">
+                <div class="metric-title">Platform Team Size</div>
+                <div class="metric-value">8 Eng</div>
+                <div class="metric-sub" style="color:#aaaaaa;">Supporting 2,000+ developers</div>
+                <div class="metric-bar"><div class="metric-bar-fill" data-target="100" style="background: #ff6f00;"></div></div>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            <div class="charts-container">
+                <div class="chart-block">
+                    <h3>API Registration Growth (12-Month Target)</h3>
+                    <canvas id="adoptionChart" height="110"></canvas>
+                </div>
+                <div class="chart-block">
+                    <h3>Compliance Rate by Rule Type (%)</h3>
+                    <canvas id="registrationChart" height="110"></canvas>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="timeline-panel">
+                    <h3>Squad Onboarding Timeline</h3>
+                    <p style="font-size: 0.85rem; color: #aaaaaa; margin-bottom: 20px;">Target rollout across 250 squads, managed by an 8-person platform team:</p>
+
+                    <div class="timeline-item">
+                        <div class="timeline-meta"><span class="timeline-label">Q1 — Foundation</span><span>15 Teams</span></div>
+                        <div class="timeline-track"><div class="timeline-progress" data-target="6">6%</div></div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-meta"><span class="timeline-label">Q2 — Scaling</span><span>45 Teams</span></div>
+                        <div class="timeline-track"><div class="timeline-progress" data-target="18">18%</div></div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-meta"><span class="timeline-label">Q3 — Expansion</span><span>85 Teams</span></div>
+                        <div class="timeline-track"><div class="timeline-progress" data-target="34">34%</div></div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-meta"><span class="timeline-label">Q4 — Target</span><span>180 Teams</span></div>
+                        <div class="timeline-track"><div class="timeline-progress" data-target="72">72%</div></div>
+                    </div>
+
+                    <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #222; font-size: 0.8rem; color: #aaaaaa; line-height: 1.5;">
+                        +165 teams targeted over Year 1.<br>
+                        Growth driven by Tier 1 automated onboarding — no manual steps required.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="insights-panel">
+            <h3>Expected Business Value</h3>
+            <ul class="insights-list">
+                <li class="insight-item">
+                    <h4>Reducing Duplicate Work</h4>
+                    <p>A searchable catalog directly targets the 38% duplication waste from the developer survey — teams find existing APIs before building their own. Target: eliminate redundant domain builds by Q4.</p>
+                </li>
+                <li class="insight-item">
+                    <h4>Security Compliance</h4>
+                    <p>Integrating security checks into the local validation CLI ensures APIs meet corporate security standards before they merge — targeting 94%+ automated compliance across registered services.</p>
+                </li>
+                <li class="insight-item">
+                    <h4>Developer Time Savings</h4>
+                    <p>Replacing manual governance reviews with local validation loops cuts API onboarding from hours to under 5 minutes — estimated 200+ hours of pipeline delay saved per quarter across the organisation.</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Animate metric bar fills from 0 to target
+        window.addEventListener('load', () => {
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.metric-bar-fill[data-target]').forEach(el => {
+                    const target = el.getAttribute('data-target');
+                    setTimeout(() => { el.style.width = target + '%'; }, 100);
+                });
+                document.querySelectorAll('.timeline-progress[data-target]').forEach(el => {
+                    const target = el.getAttribute('data-target');
+                    setTimeout(() => { el.style.width = target + '%'; }, 300);
+                });
+            });
+        });
+
+        // Line Chart — API Registration Growth
+        const adoptionCtx = document.getElementById('adoptionChart').getContext('2d');
+        new Chart(adoptionCtx, {
+            type: 'line',
+            data: {
+                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                datasets: [
+                    {
+                        label: 'Registered APIs',
+                        data: [420, 540, 720, 960],
+                        borderColor: '#ff6f00',
+                        backgroundColor: 'rgba(255, 111, 0, 0.05)',
+                        tension: 0.2,
+                        fill: true,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ff6f00'
+                    },
+                    {
+                        label: 'Total estimated APIs',
+                        data: [1200, 1200, 1200, 1200],
+                        borderColor: '#d32f2f',
+                        borderDash: [6, 4],
+                        fill: false,
+                        borderWidth: 1.5,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#ffffff', font: { family: 'sans-serif', size: 11 } } } },
+                scales: {
+                    y: { grid: { color: '#222' }, ticks: { color: '#aaa', font: { family: 'monospace' } } },
+                    x: { grid: { color: '#222' }, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+
+        // Bar Chart — Compliance by Rule Type
+        const registrationCtx = document.getElementById('registrationChart').getContext('2d');
+        new Chart(registrationCtx, {
+            type: 'bar',
+            data: {
+                labels: ['OAuth2 Scopes', 'SemVer', 'Response Headers', 'OpenAPI Schema'],
+                datasets: [{
+                    label: 'Compliance target (%)',
+                    data: [94, 98, 91, 100],
+                    backgroundColor: [
+                        'rgba(213, 47, 47, 0.85)',
+                        'rgba(255, 111, 0, 0.85)',
+                        'rgba(213, 47, 47, 0.7)',
+                        'rgba(255, 111, 0, 0.7)'
+                    ],
+                    borderColor: '#222222',
+                    borderWidth: 1,
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: '#222' }, ticks: { color: '#aaa', callback: function(value){ return value + '%'; }, font: { family: 'monospace' } } },
+                    x: { grid: { color: '#111' }, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

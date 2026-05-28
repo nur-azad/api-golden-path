@@ -1,0 +1,98 @@
+name: Green Path API Validation
+
+on:
+  pull_request:
+    paths:
+      - "**"
+  workflow_dispatch: {}
+
+jobs:
+  # Job 1: Demonstrates that a non-compliant spec is caught early
+  validate-bad-spec:
+    name: Validate (non-compliant spec — CI gate blocks this)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Python validator dependencies
+        working-directory: platform-tooling/python
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run custom validator against non-compliant spec
+        working-directory: platform-tooling/python
+        run: |
+          source .venv/bin/activate
+          echo "--- Validating bad_openapi.yaml (expect errors) ---"
+          python apictl.py validate ../../sample-product-api/bad_openapi.yaml
+
+      - name: Build Spectral container
+        run: docker build -t green-path-spectral platform-tooling
+
+      - name: Run Spectral ruleset against non-compliant spec
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/sample-product-api:/workspace \
+            -v ${{ github.workspace }}/platform-tooling/.spectral.yaml:/.spectral.yaml \
+            green-path-spectral /workspace/bad_openapi.yaml --ruleset /.spectral.yaml
+
+  # Job 2: The happy path — compliant spec passes and emits Backstage metadata
+  validate-good-spec:
+    name: Validate (compliant spec — Golden Path)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Python validator dependencies
+        working-directory: platform-tooling/python
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Build .NET sample
+        run: dotnet build sample-product-api/sample-dotnet/ApiDemo.csproj
+
+      - name: Run custom validator against compliant spec
+        working-directory: platform-tooling/python
+        run: |
+          source .venv/bin/activate
+          echo "--- Validating sample_openapi.yaml (expect clean) ---"
+          python apictl.py validate ../../sample-product-api/sample_openapi.yaml --emit-backstage
+
+      - name: Build Python validator container
+        run: docker build -t green-path-python-validator platform-tooling/python
+
+      - name: Run Python validator container (compliant spec)
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/sample-product-api:/workspace \
+            green-path-python-validator validate /workspace/sample_openapi.yaml --emit-backstage
+
+      - name: Build Spectral container
+        run: docker build -t green-path-spectral platform-tooling
+
+      - name: Run Spectral ruleset against compliant spec
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/sample-product-api:/workspace \
+            -v ${{ github.workspace }}/platform-tooling/.spectral.yaml:/.spectral.yaml \
+            green-path-spectral /workspace/sample_openapi.yaml --ruleset /.spectral.yaml
+
+      - name: Upload generated Backstage catalog metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: backstage-component
+          path: sample-product-api/backstage-component.yaml

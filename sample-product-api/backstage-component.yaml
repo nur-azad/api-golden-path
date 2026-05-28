@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  description: API for managing orders
+  name: sample-orders-api
+  tags:
+  - orders
+  - health
+spec:
+  lifecycle: production
+  owner: team-orders@example.com
+  system: api-platform
+  type: service
