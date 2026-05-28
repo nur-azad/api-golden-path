@@ -17,7 +17,7 @@ Built for the LEGO Group Senior Software Engineer (API Developer Portal) — 3rd
 | Custom Spectral ruleset (3 org rules)                      | `platform-tooling/.spectral.yaml`            |
 | CI gate — bad spec blocked, good spec passes              | `.github/workflows/validate.yaml`            |
 | Legacy API spec extraction from traffic capture            | `platform-tooling/python/extract.py`         |
-| React readiness card (React 18, hooks)                     | `api-readiness.html`                         |
+| API readiness scorecard (interactive HTML)                  | `api-readiness.html`                         |
 | Adoption dashboard                                         | `dashboard.html`                             |
 | Case study presentation (21 slides)                        | `presentation.html`                          |
 
@@ -25,36 +25,113 @@ Built for the LEGO Group Senior Software Engineer (API Developer Portal) — 3rd
 
 ## Full demo sequence
 
-```bash
-cd sample-product-api
+All steps use a single Docker image — no local Python or .NET runtime required.
 
+**bash**
+```bash
+# One-time build (run from repo root)
+docker build -t green-path-validator platform-tooling/python
+docker build -t green-path-spectral platform-tooling
+```
+
+**PowerShell**
+```powershell
+# One-time build (run from repo root)
+docker build -t green-path-validator platform-tooling/python
+docker build -t green-path-spectral platform-tooling
+```
+
+---
+
+**bash**
+```bash
 # 1. Show failure mode — bad spec blocked at gate
-python ../platform-tooling/python/apictl.py validate bad_openapi.yaml
+docker run --rm \
+  -v "${PWD}/sample-product-api:/workspace" \
+  green-path-validator validate /workspace/bad_openapi.yaml
 # → 2 errors found, 5 warnings found. Exit code 1.
 
 # 2. Show golden path — compliant spec passes, emits Backstage YAML
-python ../platform-tooling/python/apictl.py validate sample_openapi.yaml --emit-backstage
+docker run --rm \
+  -v "${PWD}/sample-product-api:/workspace" \
+  green-path-validator validate /workspace/sample_openapi.yaml --emit-backstage
 # → No issues found — spec looks good.
-# → Wrote Backstage metadata to backstage-component.yaml
+# → Wrote Backstage metadata to /workspace/backstage-component.yaml
 
 # 3. Lifecycle close — dry-run catalog registration
-python ../platform-tooling/python/apictl.py register sample_openapi.yaml
+docker run --rm \
+  -v "${PWD}/sample-product-api:/workspace" \
+  green-path-validator register /workspace/sample_openapi.yaml
 # → [DRY RUN] Would POST to: http://localhost:7007/api/catalog/locations
 ```
 
-Then open `api-readiness.html` in a browser — React 18 readiness card, click any check row to expand detail (`useState` expand/collapse, `useEffect` progress bar animation).
+**PowerShell**
+```powershell
+# 1. Show failure mode — bad spec blocked at gate
+docker run --rm `
+  -v "${PWD}/sample-product-api:/workspace" `
+  green-path-validator validate /workspace/bad_openapi.yaml
+# → 2 errors found, 5 warnings found. Exit code 1.
 
-```bash
-# 4. Legacy API — extract an OpenAPI spec from captured traffic
-cd ../platform-tooling/python
-python extract.py
-# → Success! Generated 'extracted_openapi.yaml' with response schemas from network logs.
+# 2. Show golden path — compliant spec passes, emits Backstage YAML
+docker run --rm `
+  -v "${PWD}/sample-product-api:/workspace" `
+  green-path-validator validate /workspace/sample_openapi.yaml --emit-backstage
+# → No issues found — spec looks good.
+# → Wrote Backstage metadata to /workspace/backstage-component.yaml
 
-python apictl.py validate extracted_openapi.yaml
-# → 0 errors, 2 warnings (SECURITY, OPENTELEMETRY_TAG)
+# 3. Lifecycle close — dry-run catalog registration
+docker run --rm `
+  -v "${PWD}/sample-product-api:/workspace" `
+  green-path-validator register /workspace/sample_openapi.yaml
+# → [DRY RUN] Would POST to: http://localhost:7007/api/catalog/locations
 ```
 
-`traffic.har` was captured live using mitmproxy as a proxy in front of the running .NET service. Existing har-to-OpenAPI tools did not produce usable output from mitmproxy's netlog format, so `extract.py` reads the length-prefix encoding directly. Works against any HTTP service regardless of language or framework.
+Then open `api-readiness.html` in a browser — click any check row to expand detail and watch the progress bar animate.
+
+---
+
+**bash**
+```bash
+# 4. Legacy API — extract an OpenAPI spec from captured traffic, then validate
+docker run --rm \
+  -v "${PWD}/platform-tooling/python:/workspace" \
+  green-path-validator extract /workspace/traffic.har --output /workspace/extracted_openapi.yaml
+# → Success! Generated 'extracted_openapi.yaml' with response schemas from network logs.
+
+docker run --rm \
+  -v "${PWD}/platform-tooling/python:/workspace" \
+  green-path-validator validate /workspace/extracted_openapi.yaml
+# → 0 errors, 2 warnings (SECURITY, OPENTELEMETRY_TAG)
+
+# 5. Spectral org-rules gate (run against compliant spec)
+docker run --rm \
+  -v "${PWD}/sample-product-api:/workspace" \
+  -v "${PWD}/platform-tooling/.spectral.yaml:/.spectral.yaml" \
+  green-path-spectral /workspace/sample_openapi.yaml --ruleset /.spectral.yaml
+```
+
+**PowerShell**
+```powershell
+# 4. Legacy API — extract an OpenAPI spec from captured traffic, then validate
+docker run --rm `
+  -v "${PWD}/platform-tooling/python:/workspace" `
+  green-path-validator extract /workspace/traffic.har --output /workspace/extracted_openapi.yaml
+# → Success! Generated 'extracted_openapi.yaml' with response schemas from network logs.
+
+docker run --rm `
+  -v "${PWD}/platform-tooling/python:/workspace" `
+  green-path-validator validate /workspace/extracted_openapi.yaml
+# → 0 errors, 2 warnings (SECURITY, OPENTELEMETRY_TAG)
+
+# 5. Spectral org-rules gate (run against compliant spec)
+docker run --rm `
+  -v "${PWD}/sample-product-api:/workspace" `
+  -v "${PWD}/platform-tooling/.spectral.yaml:/.spectral.yaml" `
+  green-path-spectral /workspace/sample_openapi.yaml --ruleset /.spectral.yaml
+```
+
+`traffic.har` was captured live using mitmproxy as a proxy in front of the running .NET service. Existing har-to-OpenAPI tools did not produce usable output from mitmproxy's netlog format, so the `extract` command reads the length-prefix encoding directly. Works against any HTTP service regardless of language or framework.
 
 ---
 
@@ -79,7 +156,7 @@ sample-product-api/
   backstage-component.yaml            Generated by --emit-backstage
   sample-dotnet/                      .NET 8 sample API (Swashbuckle, built in CI)
 
-api-readiness.html                    React 18 readiness card (CDN, no build toolchain)
+api-readiness.html                    Interactive API readiness scorecard
 dashboard.html                        Adoption dashboard (Chart.js, 12-month rollout model)
 presentation.html                     Case study slides (21 slides, speaker notes)
 ```

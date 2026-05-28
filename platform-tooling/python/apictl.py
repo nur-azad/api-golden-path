@@ -229,6 +229,89 @@ def validate(openapi_file, emit_backstage, strict):
 
 
 @cli.command()
+@click.argument("har_file", type=click.Path(exists=True))
+@click.option("--output", default="extracted_openapi.yaml", help="Output OpenAPI YAML path")
+def extract(har_file, output):
+    """Extract an OpenAPI 3.0 spec from a mitmproxy .har traffic capture."""
+    import re, json
+    from pathlib import Path as _Path
+
+    try:
+        with open(har_file, "r", encoding="utf-8", errors="ignore") as f:
+            log_data = f.read()
+    except Exception as e:
+        console.print(f"[red]Failed to read HAR file: {e}")
+        sys.exit(2)
+
+    sessions = re.split(r"\d+:9:websocket;", log_data)
+    paths = {}
+    TYPE_MAP = {
+        "int": "integer", "float": "number", "str": "string",
+        "bool": "boolean", "dict": "object", "list": "array", "NoneType": "string",
+    }
+
+    for session in sessions:
+        if not session.strip():
+            continue
+        method_match = re.search(r"method;\d+:([A-Z]+)", session)
+        path_match = re.search(r"path;\d+:(/[^\s,;#}]+)", session)
+        status_match = re.search(r"status_code;\d+:(\d+)", session)
+        if not (path_match and method_match):
+            continue
+        raw_path = path_match.group(1)
+        method = method_match.group(1).lower()
+        status = status_match.group(1) if status_match else "200"
+        if "/api/" not in raw_path:
+            continue
+        clean_path = "/api/" + raw_path.split("/api/")[-1].split("?")[0]
+        paths.setdefault(clean_path, {})
+        paths[clean_path].setdefault(method, {
+            "summary": f"Extracted legacy {method.upper()} endpoint",
+            "responses": {},
+        })
+        content_match = re.search(r"content;(\d+):([\[\{])", session)
+        schema_node = {"type": "object"}
+        if content_match:
+            length = int(content_match.group(1))
+            start = content_match.start(2)
+            try:
+                parsed = json.loads(session[start: start + length])
+                if isinstance(parsed, list) and parsed:
+                    schema_node = {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {k: {"type": TYPE_MAP.get(type(v).__name__, "string")} for k, v in parsed[0].items()},
+                        },
+                    }
+                elif isinstance(parsed, dict):
+                    schema_node = {
+                        "type": "object",
+                        "properties": {k: {"type": TYPE_MAP.get(type(v).__name__, "string")} for k, v in parsed.items()},
+                    }
+            except Exception:
+                pass
+        paths[clean_path][method]["responses"][status] = {
+            "description": f"Detected status {status} response transaction.",
+            "content": {"application/json": {"schema": schema_node}},
+        }
+
+    spec = {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Extracted Legacy Orders API",
+            "description": "Reverse-engineered from mitmproxy transaction traces.",
+            "version": "1.0.0",
+        },
+        "paths": paths,
+    }
+    out_path = _Path(output)
+    with out_path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(spec, f, default_flow_style=False, sort_keys=False)
+    console.print(f"[green]Success! Generated '{out_path}' with response schemas from network logs.")
+
+
+@cli.command()
 @click.argument("openapi_file", type=click.Path(exists=True))
 @click.option("--catalog-url", default="http://localhost:7007", help="Backstage base URL")
 def register(openapi_file, catalog_url):
