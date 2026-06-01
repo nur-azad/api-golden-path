@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   code-review:
-    uses: nur-azad/claude-mcp-git-ci-cd/.github/workflows/claude-review.yml@fix/repo-paths
+    uses: nur-azad/claude-mcp-git-ci-cd/.github/workflows/claude-review.yml@main
     with:
       dry_run: true
     secrets: inherit
