@@ -6,7 +6,16 @@ on:
       - "**"
   workflow_dispatch: {}
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
+  code-review:
+    uses: nur-azad/claude-mcp-git-ci-cd/.github/workflows/claude-review.yml@main
+    with:
+      dry_run: true
+    secrets: inherit
   # Job 1: Demonstrates that a non-compliant spec is caught early
   validate-bad-spec:
     name: Validate (non-compliant spec — CI gate blocks this)
