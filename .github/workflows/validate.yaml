@@ -6,6 +6,10 @@ on:
       - "**"
   workflow_dispatch: {}
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   code-review:
     uses: nur-azad/claude-mcp-git-ci-cd/.github/workflows/claude-review.yml@main
